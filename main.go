@@ -24,6 +24,7 @@ var (
 	partitionConsumer = consumer.Flag("partition", "分区").Short('p').Default("0").Int()
 	hostConsumer      = consumer.Flag("host", "host").Short('b').Required().String()
 	offsetConsumer    = consumer.Flag("offset", "offset").Short('o').Int64()
+	toOffset          = consumer.Flag("to", "to").Int64()
 )
 
 func main() {
@@ -40,6 +41,7 @@ func Consumer() {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:   []string{*hostConsumer},
 		Topic:     *topicConsumer,
+		MaxWait:   time.Millisecond * 200,
 		Partition: *partitionConsumer,
 		MinBytes:  10e3, // 10KB
 		MaxBytes:  10e6, // 10MB
@@ -52,11 +54,16 @@ func Consumer() {
 	for {
 		m, err := r.ReadMessage(context.Background())
 		if err != nil {
+			log.Println("err:", err)
 			break
 		}
 		log.Printf("message at offset %d: %s\n", m.Offset, string(m.Value))
+		if *toOffset != 0 {
+			if *toOffset <= m.Offset {
+				return
+			}
+		}
 	}
-
 	r.Close()
 }
 
